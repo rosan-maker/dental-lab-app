@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة معمل التركيبات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 font-sans p-4 min-h-screen">
+    <div class="max-w-3xl mx-auto space-y-6">
+        
+        <header class="bg-blue-600 text-white p-4 rounded-xl shadow-md text-center">
+            <h1 class="text-2xl font-bold">بوابة العيادة - تسجيل طلب تركيبة جديد</h1>
+            <p class="text-sm opacity-90 mt-1">نظام المتابعة اللحظية للحالات</p>
+        </header>
+
+        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">بيانات الحالة</h2>
+            <form id="caseForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم المريض</label>
+                        <input type="text" id="patientName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="مثال: أحمد محمود">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الطبيب</label>
+                        <input type="text" id="doctorName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="د. محمد">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">نوع الخامة</label>
+                        <select id="materialType" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="Zirconia">زيركون (Zirconia)</option>
+                            <option value="E-Max">إيماكس (E-Max)</option>
+                            <option value="PFM">بورسلين (PFM)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">درجة اللون (Shade)</label>
+                        <input type="text" id="shadeGuide" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="A1, A2, BL3...">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition">
+                    إرسال الطلب للمعمل 🚀
+                </button>
+            </form>
+        </section>
+
+        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">سجل الحالات الحالية</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-right border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 border-b text-sm text-gray-600">
+                            <th class="p-2">المريض</th>
+                            <th class="p-2">الطبيب</th>
+                            <th class="p-2">الخامة</th>
+                            <th class="p-2">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="casesTableBody">
+                        <tr><td colspan="4" class="p-4 text-center text-gray-400">جاري تحميل الحالات...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        // === استبدل البيانات التالية بمفاتيح Supabase الخاصة بك ===
+        const SUPABASE_URL = "https://tvfuspnnjblukuxqeohh.supabase.co/rest/v1/";
+        const SUPABASE_ANON_KEY = "sb_publishable_-Ym83H3dSkph1NgJqPuEeA_45mQKtXk";
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // جلب وقراءة الحالات من قاعدة البيانات
+        async function fetchCases() {
+            const { data, error } = await supabaseClient.from('cases').select('*').order('created_at', { ascending: false });
+            const tableBody = document.getElementById('casesTableBody');
+            
+            if (error) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">حدث خطأ أثناء تحميل البيانات</td></tr>`;
+                return;
+            }
+
+            if (data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400">لا توجد حالات مسجلة حتى الآن</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = data.map(c => `
+                <tr class="border-b hover:bg-gray-50 text-sm">
+                    <td class="p-2 font-semibold">${c.patient_name}</td>
+                    <td class="p-2">${c.doctor_name || '-'}</td>
+                    <td class="p-2">${c.material_type}</td>
+                    <td class="p-2"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">${c.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        // إرسال طلب حالة جديدة
+        document.getElementById('caseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const patientName = document.getElementById('patientName').value;
+            const doctorName = document.getElementById('doctorName').value;
+            const materialType = document.getElementById('materialType').value;
+            const shadeGuide = document.getElementById('shadeGuide').value;
+
+            const { error } = await supabaseClient.from('cases').insert([
+                { patient_name: patientName, doctor_name: doctorName, material_type: materialType, shade_guide: shadeGuide, status: 'in_lab' }
+            ]);
+
+            if (error) {
+                alert('حدث خطأ أثناء حفظ الطلب: ' + error.message);
+            } else {
+                alert('تم إرسال الطلب بنجاح!');
+                document.getElementById('caseForm').reset();
+                fetchCases();
+            }
+        });
+
+        // تحميل الحالات فور فتح الصفحة
+        fetchCases();
+    </script>
+</body>
+</html>
