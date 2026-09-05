@@ -3,95 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام إدارة معمل التركيبات</title>
-    <!-- Tailwind CSS -->
+    <title>بوابة العيادة - تسجيل واستعلام التركيبات</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- المكتبة المجانية لتوليد الـ QR Code -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        .tooth-btn {
+            transition: all 0.2s ease;
+        }
+        .tooth-btn.selected {
+            background-color: #2563eb !important;
+            color: white !important;
+            border-color: #1d4ed8 !important;
+            transform: scale(1.08);
+        }
+    </style>
 </head>
-<body class="bg-gray-100 font-sans p-4 min-h-screen">
+<body class="bg-gray-100 font-sans p-3 md:p-6 min-h-screen">
     <div class="max-w-4xl mx-auto space-y-6">
         
-        <header class="bg-blue-600 text-white p-4 rounded-xl shadow-md text-center">
-            <h1 class="text-2xl font-bold">بوابة إدارة التركيبات الذكية</h1>
-            <p class="text-sm opacity-90 mt-1">متابعة لحظية وتوليد QR الفروع</p>
+        <!-- الهيدر -->
+        <header class="bg-blue-600 text-white p-5 rounded-2xl shadow-md text-center">
+            <h1 class="text-2xl font-bold">🏥 بوابة العيادة - إرسال واستعلام الحالات</h1>
+            <p class="text-sm opacity-90 mt-1">التخطيط الرقمي ومتابعة حالات التركيبات بالمعمل</p>
         </header>
 
-        <!-- قسم توليد وطباعة QR الفرع -->
-        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">🖨️ إنشاء وطباعة QR Code للعيادات والفروع</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                <div class="space-y-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم العيادة والفرع</label>
-                        <input type="text" id="qrBranchName" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="مثال: عيادة الشفاء - فرع سموحة">
-                    </div>
-                    <button onclick="generateBranchQR()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg shadow transition">
-                        توليد الـ QR Code 📱
-                    </button>
-                </div>
+        <!-- كارت إضافة حالة جديدة -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">📋 تسجيل طلب تركيبة جديد</h2>
+            
+            <form id="caseForm" class="space-y-6">
                 
-                <!-- منطقة عرض الـ QR للطباعة -->
-                <div id="qrPrintArea" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 text-center">
-                    <div id="qrcode" class="mb-2"></div>
-                    <p id="qrLabel" class="font-bold text-gray-700 text-sm mb-2">أدخل اسم الفرع واضغط توليد</p>
-                    <button id="printBtn" onclick="printQR()" class="hidden bg-gray-800 text-white text-xs px-3 py-1.5 rounded shadow hover:bg-black">
-                        🖨️ طباعة الملصق
-                    </button>
+                <!-- 1. البحث وحالة المريض -->
+                <div class="bg-blue-50/60 p-4 rounded-xl border border-blue-100 space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">اسم المريض (بحث / إدخال)</label>
+                            <input type="text" id="patientName" oninput="searchPatient()" required class="w-full p-2.5 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="اكتب اسم المريض هنا...">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">العيادة / الفرع / الطبيب</label>
+                            <input type="text" id="doctorName" required class="w-full p-2.5 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none" placeholder="د. محمد - فرع سموحة">
+                        </div>
+                    </div>
+                    <!-- شريط حالة الملف الآلي -->
+                    <div id="patientStatusBadge" class="hidden text-xs font-semibold p-2.5 rounded-lg border"></div>
                 </div>
-            </div>
-        </section>
 
-        <!-- نموذج إضافة حالة -->
-        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">➕ تسجيل طلب جديد</h2>
-            <form id="caseForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 2. تفاصيل نوع التركيبة والطلب -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم المريض</label>
-                        <input type="text" id="patientName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="أحمد محمود">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الطبيب / الفرع</label>
-                        <input type="text" id="doctorName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="د. محمد - فرع سموحة">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">نوع الخامة</label>
-                        <select id="materialType" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                            <option value="Zirconia HT">زيركون (Zirconia HT)</option>
-                            <option value="E-Max CAD">إيماكس (E-Max CAD)</option>
-                            <option value="PFM Porcelain">بورسلين (PFM)</option>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">نوع الطلب</label>
+                        <select id="orderType" class="w-full p-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="new">🆕 طلب جديد</option>
+                            <option value="redo">🔄 إعادة تصنيع (Re-do)</option>
                         </select>
                     </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">نوع الخامة / التركيبة</label>
+                        <select id="materialType" onchange="handleMaterialChange()" class="w-full p-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="Zirconia HT">زيركون (Zirconia HT)</option>
+                            <option value="E-Max CAD">إيماكس (E-Max CAD)</option>
+                            <option value="PFM Porcelain">بورسلين (PFM Porcelain)</option>
+                            <option value="Veneer / Laminate">فينير / عدسات (Veneer)</option>
+                            <option value="Composite Resin">كمبوزيت / ريزن (Composite)</option>
+                            <option value="Titanium / Metal">تيتانيوم / معدن (Metal)</option>
+                            <option value="PEEK / BioHPP">بييك (PEEK / BioHPP)</option>
+                            <option value="Acrylic">أكريليك (Acrylic)</option>
+                            <option value="other">➕ نوع آخر (إدخال يدوي)...</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">درجة اللون (Shade)</label>
-                        <input type="text" id="shadeGuide" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="A1, A2, BL3...">
+                        <input type="text" id="shadeGuide" class="w-full p-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="A1, A2, BL3...">
                     </div>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition">
+
+                <!-- حقل إدخال خامة مخصصة في حال اختيار "نوع آخر" -->
+                <div id="customMaterialContainer" class="hidden bg-amber-50 p-3 rounded-xl border border-amber-200">
+                    <label class="block text-xs font-bold text-amber-900 mb-1">اكتب نوع الخامة المخصصة:</label>
+                    <input type="text" id="customMaterial" class="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-amber-500 outline-none text-sm" placeholder="مثال: BioHPP, PMMA, Temporary Crown...">
+                </div>
+
+                <!-- 3. تصنيف التركيبة ومخطط الأسنان التفاعلي (Dental Chart) -->
+                <div class="border border-gray-200 p-4 rounded-xl space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+                        <label class="text-sm font-bold text-gray-800">تحديد نطاق التركيبة والأسنان:</label>
+                        <select id="restorationCategory" onchange="handleCategoryChange()" class="p-2 text-xs border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-blue-500">
+                            <option value="custom">اختيار أسنان معينة (Single / Units)</option>
+                            <option value="crown">تاج فردي (Crown)</option>
+                            <option value="bridge">كوبري (Bridge)</option>
+                            <option value="veneer">فينير / عدسة (Veneer)</option>
+                            <option value="inlay_onlay">إنلاي / أونلاي (Inlay/Onlay)</option>
+                            <option value="implant">تركيبة على زراعة (Implant Crown)</option>
+                            <option value="full_denture">طقم كامل (Full Denture)</option>
+                            <option value="partial_denture">نص طقم (Partial Denture)</option>
+                            <option value="night_guard">واقي أسنان / حارس ليلي (Night Guard)</option>
+                            <option value="other">➕ تصنيف آخر...</option>
+                        </select>
+                    </div>
+
+                    <!-- حقل تصنيف مخصص -->
+                    <div id="customCategoryContainer" class="hidden bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                        <input type="text" id="customCategory" class="w-full p-2 border rounded-lg bg-white text-xs outline-none focus:ring-2 focus:ring-amber-500" placeholder="اكتب تصنيف التركيبة المخصص هنا...">
+                    </div>
+
+                    <!-- رسمة الأسنان التفاعلية -->
+                    <div id="dentalChart" class="space-y-3 text-center">
+                        <div>
+                            <span class="text-xs text-gray-500 font-semibold mb-1 block">الفك العلوي (Upper Arch)</span>
+                            <div class="flex justify-center flex-wrap gap-1" id="upperArch"></div>
+                        </div>
+                        <hr class="border-gray-200 my-2">
+                        <div>
+                            <div class="flex justify-center flex-wrap gap-1" id="lowerArch"></div>
+                            <span class="text-xs text-gray-500 font-semibold mt-1 block">الفك السفلي (Lower Arch)</span>
+                        </div>
+                    </div>
+
+                    <div class="text-xs text-blue-800 bg-blue-50 p-2 rounded-lg font-medium text-center">
+                        الأسنان المحددة: <span id="selectedTeethDisplay" class="font-bold text-blue-900">لم يتم تحديد أسنان بعد</span>
+                    </div>
+                </div>
+
+                <!-- 4. تاريخ الاستلام والملاحظات -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">تاريخ ووقت الاستلام المتوقع</label>
+                        <input type="datetime-local" id="dueDate" required class="w-full p-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات للمعمل</label>
+                        <textarea id="notes" rows="2" class="w-full p-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none placeholder-gray-400 text-sm" placeholder="أكتب أي تفاصيل إضافية للخرط أو التشطيب..."></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition">
                     إرسال الطلب للمعمل 🚀
                 </button>
             </form>
         </section>
 
-        <!-- جدول الحالات والتتبع -->
-        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">📋 متابعة الحالات بالمعمل</h2>
+        <!-- قسم الاستعلام ومتابعة حالة التركيبات -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-800">🔍 الاستعلام عن حالة التركيبات</h2>
+                    <p class="text-xs text-gray-500">ابحث باسم المريض أو قم بفلترة الحالات لمعرفة المرحلة الحالية بالمعمل</p>
+                </div>
+                <button onclick="fetchCases()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg border font-bold transition flex items-center gap-1">
+                    🔄 تحديث القائمة
+                </button>
+            </div>
+
+            <!-- أشرطة البحث والفلترة -->
+            <div class="flex flex-col md:flex-row gap-3">
+                <div class="w-full md:w-1/2">
+                    <input type="text" id="clinicSearchInput" oninput="applyClinicFilter()" class="w-full p-2.5 border rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm" placeholder="🔍 استعلام باسم المريض...">
+                </div>
+                <div class="flex flex-wrap gap-1.5 w-full md:w-1/2 items-center">
+                    <button onclick="setClinicFilter('all')" id="btn-c-all" class="clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-blue-600 text-white font-bold">الكل</button>
+                    <button onclick="setClinicFilter('in_lab')" id="btn-c-in_lab" class="clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700">بالمعمل</button>
+                    <button onclick="setClinicFilter('cad_cam')" id="btn-c-cad_cam" class="clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700">CAD/CAM</button>
+                    <button onclick="setClinicFilter('finishing')" id="btn-c-finishing" class="clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700">فرن وتلميع</button>
+                    <button onclick="setClinicFilter('ready')" id="btn-c-ready" class="clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700">جاهزة للتسليم</button>
+                </div>
+            </div>
+
+            <!-- جدول نتائج الاستعلام -->
             <div class="overflow-x-auto">
                 <table class="w-full text-right border-collapse">
                     <thead>
-                        <tr class="bg-gray-50 border-b text-sm text-gray-600">
+                        <tr class="bg-gray-50 border-b text-xs text-gray-600">
                             <th class="p-3">المريض</th>
-                            <th class="p-3">الطبيب / الفرع</th>
-                            <th class="p-3">الخامة واللون</th>
-                            <th class="p-3">الحالة الحالية</th>
-                            <th class="p-3 text-center">تحديث حالة المعمل</th>
+                            <th class="p-3">نوع الخامة واللون</th>
+                            <th class="p-3">الأسنان والملاحظات</th>
+                            <th class="p-3">تاريخ الاستلام المتوقع</th>
+                            <th class="p-3 text-center">حالة التركيبة بالمعمل</th>
                         </tr>
                     </thead>
                     <tbody id="casesTableBody">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400">جاري تحميل الحالات...</td></tr>
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400">جاري تحميل البيانات...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -105,8 +198,120 @@
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // فحص ما إذا كان التطبيق تم فتحه عبر مسح QR فرع معين
+        const upperTeeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+        const lowerTeeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+        let selectedTeethSet = new Set();
+        let allClinicCases = [];
+        let currentStatusFilter = 'all';
+
+        function renderTeethChart() {
+            const upperContainer = document.getElementById('upperArch');
+            const lowerContainer = document.getElementById('lowerArch');
+
+            upperContainer.innerHTML = upperTeeth.map(num => `
+                <button type="button" onclick="toggleTooth(${num})" id="tooth-${num}" class="tooth-btn w-8 h-9 text-xs font-bold border border-gray-300 rounded-md bg-gray-50 text-gray-700 hover:bg-blue-100">
+                    ${num}
+                </button>
+            `).join('');
+
+            lowerContainer.innerHTML = lowerTeeth.map(num => `
+                <button type="button" onclick="toggleTooth(${num})" id="tooth-${num}" class="tooth-btn w-8 h-9 text-xs font-bold border border-gray-300 rounded-md bg-gray-50 text-gray-700 hover:bg-blue-100">
+                    ${num}
+                </button>
+            `).join('');
+        }
+
+        function toggleTooth(num) {
+            if (selectedTeethSet.has(num)) {
+                selectedTeethSet.delete(num);
+            } else {
+                selectedTeethSet.add(num);
+            }
+            updateTeethUI();
+        }
+
+        function updateTeethUI() {
+            document.querySelectorAll('.tooth-btn').forEach(btn => btn.classList.remove('selected'));
+            selectedTeethSet.forEach(num => {
+                const btn = document.getElementById(`tooth-${num}`);
+                if (btn) btn.classList.add('selected');
+            });
+
+            const display = document.getElementById('selectedTeethDisplay');
+            if (selectedTeethSet.size === 0) {
+                display.innerText = "لم يتم تحديد أسنان بعد";
+            } else {
+                const sorted = Array.from(selectedTeethSet).sort((a,b) => a - b);
+                display.innerText = sorted.join(', ');
+            }
+        }
+
+        function handleMaterialChange() {
+            const mat = document.getElementById('materialType').value;
+            const container = document.getElementById('customMaterialContainer');
+            const input = document.getElementById('customMaterial');
+
+            if (mat === 'other') {
+                container.classList.remove('hidden');
+                input.required = true;
+            } else {
+                container.classList.add('hidden');
+                input.required = false;
+            }
+        }
+
+        function handleCategoryChange() {
+            const val = document.getElementById('restorationCategory').value;
+            const container = document.getElementById('customCategoryContainer');
+            const input = document.getElementById('customCategory');
+
+            if (val === 'other') {
+                container.classList.remove('hidden');
+                input.required = true;
+            } else {
+                container.classList.add('hidden');
+                input.required = false;
+            }
+
+            selectedTeethSet.clear();
+            if (val === 'full_denture') {
+                [...upperTeeth, ...lowerTeeth].forEach(num => selectedTeethSet.add(num));
+            }
+            updateTeethUI();
+        }
+
+        let searchTimeout;
+        async function searchPatient() {
+            clearTimeout(searchTimeout);
+            const name = document.getElementById('patientName').value.trim();
+            const badge = document.getElementById('patientStatusBadge');
+
+            if (!name || name.length < 2) {
+                badge.classList.add('hidden');
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                const { data, error } = await supabaseClient
+                    .from('cases')
+                    .select('id, patient_name')
+                    .ilike('patient_name', `%${name}%`);
+
+                badge.classList.remove('hidden');
+
+                if (data && data.length > 0) {
+                    badge.className = "text-xs font-semibold p-2.5 rounded-lg border bg-emerald-50 text-emerald-800 border-emerald-200";
+                    badge.innerHTML = `✅ عميل مسجل سابقاً (تم العثور على ${data.length} طلب سابق لمقارب هذا الاسم)`;
+                } else {
+                    badge.className = "text-xs font-semibold p-2.5 rounded-lg border bg-blue-50 text-blue-800 border-blue-200";
+                    badge.innerHTML = `ℹ️ عميل جديد (سيتم فتح وتثبيت ملف آلي لهذا المريض عند الإرسال)`;
+                }
+            }, 300);
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
+            renderTeethChart();
+            
             const urlParams = new URLSearchParams(window.location.search);
             const branchParam = urlParams.get('branch');
             if (branchParam) {
@@ -114,131 +319,129 @@
             }
         });
 
-        // توليد QR الفرع
-        let qrcodeObj = null;
-        function generateBranchQR() {
-            const branchName = document.getElementById('qrBranchName').value.trim();
-            if (!branchName) {
-                alert('يرجى إدخال اسم العيادة والفرع أولاً');
-                return;
-            }
-
-            const qrContainer = document.getElementById('qrcode');
-            qrContainer.innerHTML = '';
-
-            // رابط مباشر يُدخل اسم الفرع آلياً عند المسح
-            const currentUrl = window.location.origin + window.location.pathname;
-            const fullUrl = `${currentUrl}?branch=${encodeURIComponent(branchName)}`;
-
-            qrcodeObj = new QRCode(qrContainer, {
-                text: fullUrl,
-                width: 128,
-                height: 128
-            });
-
-            document.getElementById('qrLabel').innerText = `QR كود الخاص بـ: ${branchName}`;
-            document.getElementById('printBtn').classList.remove('hidden');
-        }
-
-        // طباعة ملصق الـ QR
-        function printQR() {
-            const branchName = document.getElementById('qrBranchName').value;
-            const printWindow = window.open('', '', 'width=400,height=400');
-            const qrImageHtml = document.getElementById('qrcode').innerHTML;
-            
-            printWindow.document.write(`
-                <html dir="rtl">
-                <head>
-                    <title>طباعة QR - ${branchName}</title>
-                    <style>
-                        body { font-family: sans-serif; text-align: center; padding: 20px; }
-                        .card { border: 2px solid #000; padding: 20px; border-radius: 12px; display: inline-block; }
-                        h2 { margin: 10px 0 5px; font-size: 18px; }
-                        p { margin: 0; font-size: 12px; color: #555; }
-                        img { margin: 15px auto; }
-                    </style>
-                </head>
-                <body>
-                    <div class="card">
-                        <p>معمل التركيبات - نظام المتابعة</p>
-                        <h2>${branchName}</h2>
-                        ${qrImageHtml}
-                        <p>امسح الكود لمتابعة وإرسال الحالات</p>
-                    </div>
-                    <script>window.onload = function() { window.print(); window.close(); }<\/script>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-        }
-
         const statusMap = {
-            'in_lab': { text: '🟡 تم الاستلام بالمعمل', bg: 'bg-yellow-100 text-yellow-800' },
-            'cad_cam': { text: '🔵 تصميم وتصنيع (CAD/CAM)', bg: 'bg-blue-100 text-blue-800' },
-            'finishing': { text: '🟣 التلميع والفرن (Finishing)', bg: 'bg-purple-100 text-purple-800' },
-            'ready': { text: '🟢 جاهز للتسليم مع المندوب', bg: 'bg-green-100 text-green-800' }
+            'in_lab': { text: '🟡 تم الاستلام بالمعمل', bg: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+            'cad_cam': { text: '🔵 تصميم وتصنيع (CAD/CAM)', bg: 'bg-blue-100 text-blue-800 border-blue-200' },
+            'finishing': { text: '🟣 التلميع والفرن (Finishing)', bg: 'bg-purple-100 text-purple-800 border-purple-200' },
+            'ready': { text: '🟢 جاهز للتسليم مع المندوب', bg: 'bg-green-100 text-green-800 border-green-200' }
         };
 
         async function fetchCases() {
             const { data, error } = await supabaseClient.from('cases').select('*').order('created_at', { ascending: false });
-            const tableBody = document.getElementById('casesTableBody');
+            if (error) {
+                document.getElementById('casesTableBody').innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">خطأ في جلب البيانات</td></tr>`;
+                return;
+            }
+
+            allClinicCases = data || [];
+            applyClinicFilter();
+        }
+
+        function setClinicFilter(type) {
+            currentStatusFilter = type;
+            document.querySelectorAll('.clinic-filter-btn').forEach(btn => {
+                btn.className = "clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700";
+            });
+            const activeBtn = document.getElementById(`btn-c-${type}`);
+            if (activeBtn) activeBtn.className = "clinic-filter-btn text-xs px-2.5 py-1.5 rounded-lg bg-blue-600 text-white font-bold";
             
-            if (error || !data) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">خطأ في جلب البيانات</td></tr>`;
+            applyClinicFilter();
+        }
+
+        function applyClinicFilter() {
+            const searchTerm = document.getElementById('clinicSearchInput').value.toLowerCase().trim();
+            const tableBody = document.getElementById('casesTableBody');
+
+            const filtered = allClinicCases.filter(c => {
+                const matchStatus = (currentStatusFilter === 'all') || (c.status === currentStatusFilter);
+                const matchSearch = !searchTerm || (c.patient_name && c.patient_name.toLowerCase().includes(searchTerm));
+                return matchStatus && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400">لا توجد نتائج تطابق الاستعلام</td></tr>`;
                 return;
             }
 
-            if (data.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد حالات مسجلة بعد</td></tr>`;
-                return;
-            }
+            tableBody.innerHTML = filtered.map(c => {
+                const statusInfo = statusMap[c.status] || { text: c.status, bg: 'bg-gray-100 text-gray-800 border-gray-200' };
+                const teethList = c.teeth_numbers ? (Array.isArray(c.teeth_numbers) ? c.teeth_numbers.join(', ') : c.teeth_numbers) : 'غير محدد';
+                const dueDateFormatted = c.due_date ? new Date(c.due_date).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+                const isRedo = c.notes && c.notes.includes('[إعادة تصنيع]');
+                const orderBadge = isRedo ? '<span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold ml-1">Re-do</span>' : '';
 
-            tableBody.innerHTML = data.map(c => {
-                const statusInfo = statusMap[c.status] || { text: c.status, bg: 'bg-gray-100 text-gray-800' };
                 return `
-                    <tr class="border-b hover:bg-gray-50 text-sm">
-                        <td class="p-3 font-bold text-gray-800">${c.patient_name}</td>
-                        <td class="p-3">${c.doctor_name || '-'}</td>
-                        <td class="p-3"><span class="font-medium">${c.material_type}</span> (${c.shade_guide || 'غير محدد'})</td>
-                        <td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ${statusInfo.bg}">${statusInfo.text}</span></td>
-                        <td class="p-3 text-center">
-                            <select onchange="updateStatus('${c.id}', this.value)" class="text-xs p-1 border rounded bg-white">
-                                <option value="" disabled selected>تغيير المرحلة...</option>
-                                <option value="in_lab">تم الاستلام</option>
-                                <option value="cad_cam">CAD/CAM</option>
-                                <option value="finishing">التلميع والفرن</option>
-                                <option value="ready">جاهز للتسليم</option>
-                            </select>
+                    <tr class="border-b hover:bg-gray-50 text-xs">
+                        <td class="p-3 font-bold text-gray-800">${orderBadge} ${c.patient_name}</td>
+                        <td class="p-3"><span class="font-bold text-blue-700">${c.material_type}</span> <br><span class="text-gray-500">${c.shade_guide || 'غير محدد'}</span></td>
+                        <td class="p-3">
+                            <span class="font-bold text-emerald-700">أسنان: ${teethList}</span>
+                            <div class="text-[11px] text-gray-400 truncate max-w-xs">${c.notes || '-'}</div>
                         </td>
+                        <td class="p-3 text-gray-600 font-medium">${dueDateFormatted}</td>
+                        <td class="p-3 text-center"><span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${statusInfo.bg}">${statusInfo.text}</span></td>
                     </tr>
                 `;
             }).join('');
         }
 
-        async function updateStatus(caseId, newStatus) {
-            const { error } = await supabaseClient.from('cases').update({ status: newStatus }).eq('id', caseId);
-            if (error) {
-                alert('حدث خطأ أثناء التحديث: ' + error.message);
-            } else {
-                fetchCases();
-            }
-        }
-
         document.getElementById('caseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const patientName = document.getElementById('patientName').value;
-            const doctorName = document.getElementById('doctorName').value;
-            const materialType = document.getElementById('materialType').value;
+            const patientName = document.getElementById('patientName').value.trim();
+            const doctorName = document.getElementById('doctorName').value.trim();
+            
+            const rawMaterialSelect = document.getElementById('materialType').value;
+            const customMaterialVal = document.getElementById('customMaterial').value.trim();
+            const finalMaterialType = (rawMaterialSelect === 'other') ? customMaterialVal : rawMaterialSelect;
+
             const shadeGuide = document.getElementById('shadeGuide').value;
+            const orderType = document.getElementById('orderType').value;
+            
+            const rawCategorySelect = document.getElementById('restorationCategory').value;
+            const customCategoryVal = document.getElementById('customCategory').value.trim();
+            const dueDate = document.getElementById('dueDate').value;
+            const rawNotes = document.getElementById('notes').value;
+
+            const selectedTeethArray = Array.from(selectedTeethSet).sort((a,b) => a - b);
+            
+            const categoryTextMap = {
+                'custom': 'أسنان محددة',
+                'crown': 'تاج Crown',
+                'bridge': 'كوبري Bridge',
+                'veneer': 'فينير Veneer',
+                'inlay_onlay': 'إنلاي/أونلاي Inlay/Onlay',
+                'implant': 'زراعة Implant',
+                'full_denture': 'طقم كامل Full Denture',
+                'partial_denture': 'نص طقم Partial Denture',
+                'night_guard': 'واقي أسنان Night Guard',
+                'other': customCategoryVal || 'تصنيف مخصص'
+            };
+
+            const fullNotes = `[التصنيف: ${categoryTextMap[rawCategorySelect] || rawCategorySelect}] ${orderType === 'redo' ? '[إعادة تصنيع] ' : ''} ${rawNotes}`;
 
             const { error } = await supabaseClient.from('cases').insert([
-                { patient_name: patientName, doctor_name: doctorName, material_type: materialType, shade_guide: shadeGuide, status: 'in_lab' }
+                { 
+                    patient_name: patientName, 
+                    doctor_name: doctorName, 
+                    material_type: finalMaterialType, 
+                    shade_guide: shadeGuide, 
+                    teeth_numbers: selectedTeethArray,
+                    due_date: dueDate ? new Date(dueDate).toISOString() : null,
+                    notes: fullNotes,
+                    status: 'in_lab' 
+                }
             ]);
 
             if (error) {
-                alert('حدث خطأ: ' + error.message);
+                alert('حدث خطأ أثناء حفظ الطلب: ' + error.message);
             } else {
+                alert('تم حفظ وإرسال طلب التركيبة للمعمل بنجاح! 🚀');
                 document.getElementById('caseForm').reset();
+                selectedTeethSet.clear();
+                updateTeethUI();
+                document.getElementById('customMaterialContainer').classList.add('hidden');
+                document.getElementById('customCategoryContainer').classList.add('hidden');
+                document.getElementById('patientStatusBadge').classList.add('hidden');
                 fetchCases();
             }
         });
