@@ -4,16 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام إدارة معمل التركيبات</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- المكتبة المجانية لتوليد الـ QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="bg-gray-100 font-sans p-4 min-h-screen">
     <div class="max-w-4xl mx-auto space-y-6">
         
         <header class="bg-blue-600 text-white p-4 rounded-xl shadow-md text-center">
             <h1 class="text-2xl font-bold">بوابة إدارة التركيبات الذكية</h1>
-            <p class="text-sm opacity-90 mt-1">متابعة لحظية بين العيادة والمعمل</p>
+            <p class="text-sm opacity-90 mt-1">متابعة لحظية وتوليد QR الفروع</p>
         </header>
+
+        <!-- قسم توليد وطباعة QR الفرع -->
+        <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">🖨️ إنشاء وطباعة QR Code للعيادات والفروع</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم العيادة والفرع</label>
+                        <input type="text" id="qrBranchName" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="مثال: عيادة الشفاء - فرع سموحة">
+                    </div>
+                    <button onclick="generateBranchQR()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg shadow transition">
+                        توليد الـ QR Code 📱
+                    </button>
+                </div>
+                
+                <!-- منطقة عرض الـ QR للطباعة -->
+                <div id="qrPrintArea" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 text-center">
+                    <div id="qrcode" class="mb-2"></div>
+                    <p id="qrLabel" class="font-bold text-gray-700 text-sm mb-2">أدخل اسم الفرع واضغط توليد</p>
+                    <button id="printBtn" onclick="printQR()" class="hidden bg-gray-800 text-white text-xs px-3 py-1.5 rounded shadow hover:bg-black">
+                        🖨️ طباعة الملصق
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <!-- نموذج إضافة حالة -->
         <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -76,7 +105,73 @@
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ترجمة الحالات للألوان
+        // فحص ما إذا كان التطبيق تم فتحه عبر مسح QR فرع معين
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const branchParam = urlParams.get('branch');
+            if (branchParam) {
+                document.getElementById('doctorName').value = decodeURIComponent(branchParam);
+            }
+        });
+
+        // توليد QR الفرع
+        let qrcodeObj = null;
+        function generateBranchQR() {
+            const branchName = document.getElementById('qrBranchName').value.trim();
+            if (!branchName) {
+                alert('يرجى إدخال اسم العيادة والفرع أولاً');
+                return;
+            }
+
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+
+            // رابط مباشر يُدخل اسم الفرع آلياً عند المسح
+            const currentUrl = window.location.origin + window.location.pathname;
+            const fullUrl = `${currentUrl}?branch=${encodeURIComponent(branchName)}`;
+
+            qrcodeObj = new QRCode(qrContainer, {
+                text: fullUrl,
+                width: 128,
+                height: 128
+            });
+
+            document.getElementById('qrLabel').innerText = `QR كود الخاص بـ: ${branchName}`;
+            document.getElementById('printBtn').classList.remove('hidden');
+        }
+
+        // طباعة ملصق الـ QR
+        function printQR() {
+            const branchName = document.getElementById('qrBranchName').value;
+            const printWindow = window.open('', '', 'width=400,height=400');
+            const qrImageHtml = document.getElementById('qrcode').innerHTML;
+            
+            printWindow.document.write(`
+                <html dir="rtl">
+                <head>
+                    <title>طباعة QR - ${branchName}</title>
+                    <style>
+                        body { font-family: sans-serif; text-align: center; padding: 20px; }
+                        .card { border: 2px solid #000; padding: 20px; border-radius: 12px; display: inline-block; }
+                        h2 { margin: 10px 0 5px; font-size: 18px; }
+                        p { margin: 0; font-size: 12px; color: #555; }
+                        img { margin: 15px auto; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <p>معمل التركيبات - نظام المتابعة</p>
+                        <h2>${branchName}</h2>
+                        ${qrImageHtml}
+                        <p>امسح الكود لمتابعة وإرسال الحالات</p>
+                    </div>
+                    <script>window.onload = function() { window.print(); window.close(); }<\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+
         const statusMap = {
             'in_lab': { text: '🟡 تم الاستلام بالمعمل', bg: 'bg-yellow-100 text-yellow-800' },
             'cad_cam': { text: '🔵 تصميم وتصنيع (CAD/CAM)', bg: 'bg-blue-100 text-blue-800' },
