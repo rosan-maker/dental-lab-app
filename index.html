@@ -8,31 +8,32 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gray-100 font-sans p-4 min-h-screen">
-    <div class="max-w-3xl mx-auto space-y-6">
+    <div class="max-w-4xl mx-auto space-y-6">
         
         <header class="bg-blue-600 text-white p-4 rounded-xl shadow-md text-center">
-            <h1 class="text-2xl font-bold">بوابة العيادة - تسجيل طلب تركيبة جديد</h1>
-            <p class="text-sm opacity-90 mt-1">نظام المتابعة اللحظية للحالات</p>
+            <h1 class="text-2xl font-bold">بوابة إدارة التركيبات الذكية</h1>
+            <p class="text-sm opacity-90 mt-1">متابعة لحظية بين العيادة والمعمل</p>
         </header>
 
+        <!-- نموذج إضافة حالة -->
         <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">بيانات الحالة</h2>
+            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">➕ تسجيل طلب جديد</h2>
             <form id="caseForm" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">اسم المريض</label>
-                        <input type="text" id="patientName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="مثال: أحمد محمود">
+                        <input type="text" id="patientName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="أحمد محمود">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الطبيب</label>
-                        <input type="text" id="doctorName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="د. محمد">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">اسم الطبيب / الفرع</label>
+                        <input type="text" id="doctorName" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="د. محمد - فرع سموحة">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">نوع الخامة</label>
                         <select id="materialType" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                            <option value="Zirconia">زيركون (Zirconia)</option>
-                            <option value="E-Max">إيماكس (E-Max)</option>
-                            <option value="PFM">بورسلين (PFM)</option>
+                            <option value="Zirconia HT">زيركون (Zirconia HT)</option>
+                            <option value="E-Max CAD">إيماكس (E-Max CAD)</option>
+                            <option value="PFM Porcelain">بورسلين (PFM)</option>
                         </select>
                     </div>
                     <div>
@@ -46,20 +47,22 @@
             </form>
         </section>
 
+        <!-- جدول الحالات والتتبع -->
         <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">سجل الحالات الحالية</h2>
+            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">📋 متابعة الحالات بالمعمل</h2>
             <div class="overflow-x-auto">
                 <table class="w-full text-right border-collapse">
                     <thead>
                         <tr class="bg-gray-50 border-b text-sm text-gray-600">
-                            <th class="p-2">المريض</th>
-                            <th class="p-2">الطبيب</th>
-                            <th class="p-2">الخامة</th>
-                            <th class="p-2">الحالة</th>
+                            <th class="p-3">المريض</th>
+                            <th class="p-3">الطبيب / الفرع</th>
+                            <th class="p-3">الخامة واللون</th>
+                            <th class="p-3">الحالة الحالية</th>
+                            <th class="p-3 text-center">تحديث حالة المعمل</th>
                         </tr>
                     </thead>
                     <tbody id="casesTableBody">
-                        <tr><td colspan="4" class="p-4 text-center text-gray-400">جاري تحميل الحالات...</td></tr>
+                        <tr><td colspan="5" class="p-4 text-center text-gray-400">جاري تحميل الحالات...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -68,38 +71,64 @@
     </div>
 
     <script>
-        // === استبدل البيانات التالية بمفاتيح Supabase الخاصة بك ===
         const SUPABASE_URL = "https://tvfuspnnjblukuxqeohh.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_-Ym83H3dSkph1NgJqPuEeA_45mQKtXk";
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // جلب وقراءة الحالات من قاعدة البيانات
+        // ترجمة الحالات للألوان
+        const statusMap = {
+            'in_lab': { text: '🟡 تم الاستلام بالمعمل', bg: 'bg-yellow-100 text-yellow-800' },
+            'cad_cam': { text: '🔵 تصميم وتصنيع (CAD/CAM)', bg: 'bg-blue-100 text-blue-800' },
+            'finishing': { text: '🟣 التلميع والفرن (Finishing)', bg: 'bg-purple-100 text-purple-800' },
+            'ready': { text: '🟢 جاهز للتسليم مع المندوب', bg: 'bg-green-100 text-green-800' }
+        };
+
         async function fetchCases() {
             const { data, error } = await supabaseClient.from('cases').select('*').order('created_at', { ascending: false });
             const tableBody = document.getElementById('casesTableBody');
             
-            if (error) {
-                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">حدث خطأ أثناء تحميل البيانات</td></tr>`;
+            if (error || !data) {
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">خطأ في جلب البيانات</td></tr>`;
                 return;
             }
 
             if (data.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400">لا توجد حالات مسجلة حتى الآن</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">لا توجد حالات مسجلة بعد</td></tr>`;
                 return;
             }
 
-            tableBody.innerHTML = data.map(c => `
-                <tr class="border-b hover:bg-gray-50 text-sm">
-                    <td class="p-2 font-semibold">${c.patient_name}</td>
-                    <td class="p-2">${c.doctor_name || '-'}</td>
-                    <td class="p-2">${c.material_type}</td>
-                    <td class="p-2"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">${c.status}</span></td>
-                </tr>
-            `).join('');
+            tableBody.innerHTML = data.map(c => {
+                const statusInfo = statusMap[c.status] || { text: c.status, bg: 'bg-gray-100 text-gray-800' };
+                return `
+                    <tr class="border-b hover:bg-gray-50 text-sm">
+                        <td class="p-3 font-bold text-gray-800">${c.patient_name}</td>
+                        <td class="p-3">${c.doctor_name || '-'}</td>
+                        <td class="p-3"><span class="font-medium">${c.material_type}</span> (${c.shade_guide || 'غير محدد'})</td>
+                        <td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ${statusInfo.bg}">${statusInfo.text}</span></td>
+                        <td class="p-3 text-center">
+                            <select onchange="updateStatus('${c.id}', this.value)" class="text-xs p-1 border rounded bg-white">
+                                <option value="" disabled selected>تغيير المرحلة...</option>
+                                <option value="in_lab">تم الاستلام</option>
+                                <option value="cad_cam">CAD/CAM</option>
+                                <option value="finishing">التلميع والفرن</option>
+                                <option value="ready">جاهز للتسليم</option>
+                            </select>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
-        // إرسال طلب حالة جديدة
+        async function updateStatus(caseId, newStatus) {
+            const { error } = await supabaseClient.from('cases').update({ status: newStatus }).eq('id', caseId);
+            if (error) {
+                alert('حدث خطأ أثناء التحديث: ' + error.message);
+            } else {
+                fetchCases();
+            }
+        }
+
         document.getElementById('caseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const patientName = document.getElementById('patientName').value;
@@ -112,15 +141,13 @@
             ]);
 
             if (error) {
-                alert('حدث خطأ أثناء حفظ الطلب: ' + error.message);
+                alert('حدث خطأ: ' + error.message);
             } else {
-                alert('تم إرسال الطلب بنجاح!');
                 document.getElementById('caseForm').reset();
                 fetchCases();
             }
         });
 
-        // تحميل الحالات فور فتح الصفحة
         fetchCases();
     </script>
 </body>
